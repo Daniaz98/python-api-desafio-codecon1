@@ -160,6 +160,58 @@ def get_top_countries_by_users(file_path):
     return top_countries_dict
 
 
+@app.route("/team-insights", methods=["GET"])
+def get_team_insights():
+    start_time = time.time()
+    file = request.files['file']
+
+    if file.filename == '':
+        return jsonify({'error': 'Arquivo sem nome'}), 400
+    
+    dt = datetime.now().isoformat()
+
+    file_path = os.path.join(app.config['UPLOAD_FOLDER'], file.filename)
+    file.save(file_path)
+
+    team_data = team_in_data(file_path)
+
+    end_time = time.time()
+    duration = f"{round((end_time - start_time) * 1000, 2)} ms"
+
+    return jsonify({
+        "response": {
+            "status": 200,
+            "body": {
+                "execution_time_ms": duration,
+                "timestamp": dt,
+                "teams": team_data
+            }
+        }
+    })
+
+def team_in_data(file_path):
+    team_projects = defaultdict(int)
+
+    with open(file_path, 'r', encoding='utf-8') as f:
+        users = json.load(f)
+
+        for user in users:
+            team = user.get("team", {})
+            team_name = user.get("name", "").strip()
+
+            projects = team.get("projects", [])
+            completed_count = sum(1 for p in projects if p.get("completed") is True)
+
+        if team_name:
+            team_projects[team_name] += completed_count
+
+    result = [{"team": name, "completed_projects": total} for name, total in team_projects.items()]
+
+    result.sort(key=lambda x: x["completed_projects"], reverse=True)
+
+    return result
+
+
 if __name__ == "__main__":
     app.run(debug=True)
 
